@@ -29,6 +29,8 @@
 		1BBB4A572252EBF100C581B4 /* main.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
 		1BBB4A5F2252EC1400C581B4 /* GLUT.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = GLUT.framework; path = System/Library/Frameworks/GLUT.framework; sourceTree = SDKROOT; };
 		1BBB4A612252EC2100C581B4 /* OpenGL.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = OpenGL.framework; path = System/Library/Frameworks/OpenGL.framework; sourceTree = SDKROOT; };
+		1BF45B5C22740B1000799B30 /* cpu.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = cpu.h; sourceTree = "<group>"; };
+		1BF45B5D22740E6700799B30 /* gl.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = gl.h; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -65,6 +67,8 @@
 			isa = PBXGroup;
 			children = (
 				1BBB4A572252EBF100C581B4 /* main.cpp */,
+				1BF45B5C22740B1000799B30 /* cpu.h */,
+				1BF45B5D22740E6700799B30 /* gl.h */,
 			);
 			path = chip8em;
 			sourceTree = "<group>";
@@ -118,6 +122,7 @@
 			hasScannedForEncodings = 0;
 			knownRegions = (
 				en,
+				Base,
 			);
 			mainGroup = 1BBB4A4B2252EBF000C581B4;
 			productRefGroup = 1BBB4A552252EBF000C581B4 /* Products */;
