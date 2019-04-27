@@ -14,11 +14,12 @@
 #include <vector>
 #include <thread>
 #include <chrono>
+#include <fstream>
 
 class Cpu;
 
 // Typedef used in for function routines called in assembly table to abstract assembly functionality from CPU memory / architecture
-typedef void * (*opRoutine)(Cpu &cpu, uint16_t);
+typedef uint16_t (*opRoutine)(Cpu &cpu);
 
 class Cpu {
 private:
@@ -27,6 +28,7 @@ private:
     
     // Optcode value
     uint16_t opcode;
+    
     // Main memory
     // 0x000-0x1FF - Chip 8 interpreter (contains font set in emu)
     // 0x050-0x0A0 - Used for the built in 4x5 pixel font set (0-F)
@@ -59,113 +61,170 @@ private:
     
     class Assembly {
     public:
-        static void * call_rca1802(Cpu &cpu, uint16_t opcode) {
-            // TODO: not really sure what this function does			
-            return nullptr;
+        static uint16_t call_rca1802(Cpu &cpu) {
+            // TODO: not really sure what this function does
+            return 0;
         }
-        static void * disp_clear_screen(Cpu &cpu, uint16_t opcode) {
+        static uint16_t disp_clear_screen(Cpu &cpu) {
             memset(cpu.gfx, 0, sizeof(gfx));
             cpu.redraw_required = true;
-            return nullptr;
+            cpu.pc += 2;
+            return 0;
         }
-        static void * flow_return_subroutine(Cpu &cpu, uint16_t opcode) {
-            return nullptr;
+        static uint16_t flow_return_subroutine(Cpu &cpu) {
+            --cpu.sp;
+            cpu.pc = cpu.stack[cpu.sp];
+            return 0;
         }
-        static void * flow_jmp_to_addr(Cpu &cpu, uint16_t opcode) {
-            return nullptr;
+        static uint16_t flow_jmp_to_addr(Cpu &cpu) {
+            cpu.pc = cpu.opcode & 0x0FFF;
+            return 0;
         }
-        static void * flow_subroutine(Cpu &cpu, uint16_t opcode) {
-            return nullptr;
+        static uint16_t flow_subroutine(Cpu &cpu) {
+            cpu.stack[cpu.sp] = cpu.pc;
+            ++cpu.sp;
+            cpu.pc = cpu.opcode & 0x0FFF;
+            return 0;
         }
-        static void * cond_eq_rn(Cpu &cpu, uint16_t opcode) {
-            return nullptr;
+        static uint16_t cond_eq_rn(Cpu &cpu) {
+            uint8_t r = (cpu.opcode & 0xF0) >> 4;
+            uint8_t n = cpu.opcode & 0xFF;
+            cpu.pc += 2;
+            return cpu.V[r] == n;
         }
-        static void * cond_neq_rn(Cpu &cpu, uint16_t opcode) {
-            return nullptr;
+        static uint16_t cond_neq_rn(Cpu &cpu) {
+            uint8_t r = (cpu.opcode & 0xF0) >> 4;
+            uint8_t n = cpu.opcode & 0xFF;
+            cpu.pc += 2;
+            return cpu.V[r] != n;
         }
-        static void * cond_eq_rr(Cpu &cpu, uint16_t opcode) {
-            return nullptr;
+        static uint16_t cond_eq_rr(Cpu &cpu) {
+            uint8_t r1 = (cpu.opcode & 0xF00) >> 8;
+            uint8_t r2 = (cpu.opcode & 0xF0) >> 4;
+            cpu.pc += 2;
+            return cpu.V[r1] == cpu.V[r2];
         }
-        static void * const_set(Cpu &cpu, uint16_t opcode) {
-            return nullptr;
+        static uint16_t const_set(Cpu &cpu) {
+            uint8_t r = (cpu.opcode & 0xF00) >> 8;
+            cpu.V[r] = cpu.opcode & 0xFF;
+            cpu.pc += 2;
+            return 0;
         }
-        static void * const_add(Cpu &cpu, uint16_t opcode) {
-            return nullptr;
+        static uint16_t const_add_eq(Cpu &cpu) {
+            uint8_t r = (cpu.opcode & 0xF00) >> 8;
+            uint8_t value = cpu.opcode & 0xFF;
+            cpu.V[r] = value;
+            cpu.pc += 2;
+            return 0;
         }
-        static void * assign_register(Cpu &cpu, uint16_t opcode) {
-            return nullptr;
+        static uint16_t assign_register(Cpu &cpu) {
+            uint8_t r1 = (cpu.opcode & 0xF00) >> 8;
+            uint8_t r2 = (cpu.opcode & 0xF0) >> 4;
+            cpu.V[r1] = cpu.V[r2];
+            cpu.pc += 2;
+            return 0;
         }
-        static void * bitop_or(Cpu &cpu, uint16_t opcode) {
-            return nullptr;
+        static uint16_t bitop_or(Cpu &cpu) {
+            uint8_t r1 = (cpu.opcode & 0xF00) >> 8;
+            uint8_t r2 = (cpu.opcode & 0xF0) >> 4;
+            cpu.V[r1] |= cpu.V[r2];
+            cpu.pc += 2;
+            return 0;
         }
-        static void * bitop_and(Cpu &cpu, uint16_t opcode) {
-            return nullptr;
+        static uint16_t bitop_and(Cpu &cpu) {
+            uint8_t r1 = (cpu.opcode & 0xF00) >> 8;
+            uint8_t r2 = (cpu.opcode & 0xF0) >> 4;
+            cpu.V[r1] &= cpu.V[r2];
+            cpu.pc += 2;
+            return 0;
         }
-        static void * bitop_xor(Cpu &cpu, uint16_t opcode) {
-            return nullptr;
+        static uint16_t bitop_xor(Cpu &cpu) {
+            uint8_t r1 = (cpu.opcode & 0xF00) >> 8;
+            uint8_t r2 = (cpu.opcode & 0xF0) >> 4;
+            cpu.V[r1] ^= cpu.V[r2];
+            cpu.pc += 2;
+            return 0;
         }
-        static void * math_addeq(Cpu &cpu, uint16_t opcode) {
-            return nullptr;
+        static uint16_t math_addeq(Cpu &cpu) {
+            uint8_t r1 = (cpu.opcode & 0xF00) >> 8;
+            uint8_t r2 = (cpu.opcode & 0xF0) >> 4;
+            bool set_vf = (cpu.V[r1] + cpu.V[r2] > 0xFF);
+            cpu.V[r1] += cpu.V[r2];
+            cpu.V[0xF] = set_vf;
+            cpu.pc += 2;
+            return 0;
         }
-        static void * math_subeq(Cpu &cpu, uint16_t opcode) {
-            return nullptr;
+        static uint16_t math_subeq(Cpu &cpu) {
+            uint8_t r1 = (cpu.opcode & 0xF00) >> 8;
+            uint8_t r2 = (cpu.opcode & 0xF0) >> 4;
+            // TODO: Check on the comparison operator direction, from the wiki docs I would assume this to be right
+            bool set_vf = (cpu.V[r2] < cpu.V[r1]);
+            cpu.V[r1] -= cpu.V[r2];
+            cpu.V[0xF] = set_vf;
+            cpu.pc += 2;
+            return 0;
         }
-        static void * bitop_rseq(Cpu &cpu, uint16_t opcode) {
-            return nullptr;
+        static uint16_t bitop_rseq(Cpu &cpu) {
+            uint8_t r = (cpu.opcode & 0xF00) >> 8;
+            uint8_t lsb = cpu.V[r] & 0x1;
+            cpu.V[0xF] = lsb;
+            cpu.V[r] >>= 1;
+            cpu.pc += 2;
+            return 0;
         }
-        static void * math_sub(Cpu &cpu, uint16_t opcode) {
-            return nullptr;
+        static uint16_t math_sub(Cpu &cpu) {
+            return 0;
         }
-        static void * bitop_lseq(Cpu &cpu, uint16_t opcode) {
-            return nullptr;
+        static uint16_t bitop_lseq(Cpu &cpu) {
+            return 0;
         }
-        static void * cond_neq_rr(Cpu &cpu, uint16_t opcode) {
-            return nullptr;
+        static uint16_t cond_neq_rr(Cpu &cpu) {
+            return 0;
         }
-        static void * mem_setaddr(Cpu &cpu, uint16_t opcode) {
-            return nullptr;
+        static uint16_t mem_setaddr(Cpu &cpu) {
+            return 0;
         }
-        static void * flow_jmp_addr_add(Cpu &cpu, uint16_t opcode) {
-            return nullptr;
+        static uint16_t flow_jmp_addr_add(Cpu &cpu) {
+            return 0;
         }
-        static void * rand_gen(Cpu &cpu, uint16_t opcode) {
-            return nullptr;
+        static uint16_t rand_gen(Cpu &cpu) {
+            return 0;
         }
-        static void * disp_draw_vv(Cpu &cpu, uint16_t opcode) {
-            return nullptr;
+        static uint16_t disp_draw_vv(Cpu &cpu) {
+            return 0;
         }
-        static void * keyop_eq(Cpu &cpu, uint16_t opcode) {
-            return nullptr;
+        static uint16_t keyop_eq(Cpu &cpu) {
+            return 0;
         }
-        static void * keyop_neq(Cpu &cpu, uint16_t opcode) {
-            return nullptr;
+        static uint16_t keyop_neq(Cpu &cpu) {
+            return 0;
         }
-        static void * timer_set(Cpu &cpu, uint16_t opcode) {
-            return nullptr;
+        static uint16_t timer_set(Cpu &cpu) {
+            return 0;
         }
-        static void * keyop_get(Cpu &cpu, uint16_t opcode) {
-            return nullptr;
+        static uint16_t keyop_get(Cpu &cpu) {
+            return 0;
         }
-        static void * timer_delay(Cpu &cpu, uint16_t opcode) {
-            return nullptr;
+        static uint16_t timer_delay(Cpu &cpu) {
+            return 0;
         }
-        static void * sound_set(Cpu &cpu, uint16_t opcode) {
-            return nullptr;
+        static uint16_t sound_set(Cpu &cpu) {
+            return 0;
         }
-        static void * mem_addeq(Cpu &cpu, uint16_t opcode) {
-            return nullptr;
+        static uint16_t mem_addeq(Cpu &cpu) {
+            return 0;
         }
-        static void * mem_sprite_add_r(Cpu &cpu, uint16_t opcode) {
-            return nullptr;
+        static uint16_t mem_sprite_add_r(Cpu &cpu) {
+            return 0;
         }
-        static void * bcd_store(Cpu &cpu, uint16_t opcode) {
-            return nullptr;
+        static uint16_t bcd_store(Cpu &cpu) {
+            return 0;
         }
-        static void * mem_dump(Cpu &cpu, uint16_t opcode) {
-            return nullptr;
+        static uint16_t mem_dump(Cpu &cpu) {
+            return 0;
         }
-        static void * mem_load(Cpu &cpu, uint16_t opcode) {
-            return nullptr;
+        static uint16_t mem_load(Cpu &cpu) {
+            return 0;
         }
         
     };
@@ -192,7 +251,7 @@ private:
         } else if (leading_nibble == 6) {
             return Assembly::const_set;
         } else if (leading_nibble == 7) {
-            return Assembly::const_add;
+            return Assembly::const_add_eq;
         } else if (leading_nibble == 8) {
             uint8_t endVal = opcode & 0xF;
             switch (endVal) {
@@ -255,20 +314,41 @@ private:
                 case 0x65:
                     return Assembly::mem_load;
             }
-        } else {
-            return nullptr;
         }
         return nullptr;
     }
     
 public:
-    void load_game(std::string filename) {
+    Cpu() : pc{0x200}, opcode{0}, I{0}, sp{0} {
+        memset(gfx, 0, WIDTH_PIXELS * HEIGHT_PIXELS * sizeof(gfx[0]));
+        memset(stack, 0, STACK_DEPTH * sizeof(stack[0]));
+        memset(V, 0, CHIP8_NUM_REGISTERS * sizeof(V[0]));
+        memset(memory, 0, CHIP8_MEMORY_SIZE * sizeof(memory[0]));
         
+        // Load fonts
+        for (int i = 0; i < 80; ++i) {
+            // TODO: Fonts?????
+            // memory[i] = chip8_fontset[i];
+        }
+        
+        delay_timer = 0;
+        sound_timer = 0;
+    }
+    void load_game(std::string filename) {
+        std::ifstream file(filename, std::ios::binary);
+        int i = 0x200;
+        for (int i = 0x200; i < CHIP8_MEMORY_SIZE && !file.eof(); ++i) {
+            uint8_t data;
+            file >> data;
+            memory[i] = data;
+        }
+        if (i > CHIP8_MEMORY_SIZE) {
+            std::cerr << "Binary file given cannot be loaded in chip8 memory." << std::endl;
+        }
     }
     
     void emulate_cycle() {
         // Fetch code
-        uint16_t opcode;
         opcode = memory[pc] << 8 | memory[pc + 1];
         
         // Decode opcode
@@ -278,12 +358,9 @@ public:
             std::cerr << "Illegal instruction received: " << std::hex << opcode << std::endl;
             throw;
         }
-        // Execute opcode
-        uint16_t data = opcode;
-        auto val = routine(*this, data);
         
-        // Update pc
-        pc += 2;
+        // Execute opcode
+        auto val = routine(*this);
         
         // Update timers, running ideally at 60Hz, calling this function should take 1000/60ms
         // Assume prior code took negligible time
